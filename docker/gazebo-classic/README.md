@@ -53,8 +53,8 @@ sudo systemctl restart docker
 ### Step 1: Build the Docker Image
 
 ```bash
-cd paparazzi/docker/gazebo-classic
-docker build -t paparazziuav/pprz-gazebo-classic .
+cd paparazzi
+docker build -f docker/gazebo-classic/Dockerfile -t paparazziuav/pprz-gazebo-classic .
 ```
 
 This takes ~10-15 minutes the first time (downloads Ubuntu 22.04 + all
@@ -75,6 +75,8 @@ git submodule update sw/ext/tudelft_gazebo_models
 
 ```bash
 cd paparazzi/docker/gazebo-classic
+
+#if id does not work: cd docker/gazebo-classic
 
 # Option A: Interactive shell (recommended for first run)
 ./run_gazebo_sim.sh

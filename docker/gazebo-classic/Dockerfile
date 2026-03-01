@@ -43,7 +43,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-future \
     python3-lxml \
     python3-numpy \
+    python3-pip \
     python3-opencv \
+    python3-opengl \
+    python3-pyqt5 \
+    python3-pyqt5.qtwebengine \
+    python3-pyqtgraph \
+    python3-scipy \
+    python3-serial \
+    python3-matplotlib \
     # Unified Mocap Router
     libboost-program-options-dev \
     libboost-filesystem-dev \
@@ -80,6 +88,29 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     vim \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Python dependencies matching the repo virtualenv requirements
+COPY requirements.txt /tmp/requirements.txt
+RUN python3 -m pip install --no-cache-dir --upgrade pip \
+    && awk '!/^(PyQt5|PyQtWebEngine|pyqtgraph|scipy|pyserial|PyOpenGL|matplotlib)$/' /tmp/requirements.txt > /tmp/requirements.pip.txt \
+    && python3 -m pip install --no-cache-dir -r /tmp/requirements.pip.txt \
+    && printf '%s\n' \
+       'import importlib' \
+       'modules = ["lxml", "numpy", "scipy", "ivy", "serial", "PyQt5.QtWidgets", "PyQt5.QtWebEngineWidgets", "pyqtgraph", "OpenGL", "unidecode", "matplotlib", "distro", "em", "pexpect", "setuptools"]' \
+       'missing = []' \
+       'for module in modules:' \
+       '    try:' \
+       '        importlib.import_module(module)' \
+       '    except Exception as exc:' \
+       '        missing.append(f"{module}: {exc}")' \
+       'if missing:' \
+       '    raise SystemExit("Missing Python modules:\\n" + "\\n".join(missing))' \
+       'print("All required Python modules are importable.")' \
+       > /tmp/verify_python_deps.py \
+    && python3 /tmp/verify_python_deps.py \
+    && rm -f /tmp/verify_python_deps.py \
+    && rm -f /tmp/requirements.pip.txt \
+    && rm -f /tmp/requirements.txt
+
 # ── Runtime environment ───────────────────────────────────────────────
 ENV PULSE_SERVER=/run/pulse/native
 
@@ -90,7 +121,7 @@ RUN groupadd -f input \
     && useradd --shell /bin/bash -u $USER_ID -o -c "Paparazzi Docker user" -m $USERNAME \
     && usermod -aG sudo,dialout,plugdev,input $USERNAME
 
-COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY docker/gazebo-classic/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 ENTRYPOINT ["/tini", "--", "/usr/local/bin/entrypoint.sh"]
