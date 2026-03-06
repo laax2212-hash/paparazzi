@@ -69,6 +69,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # Joystick
     joystick \
     libsdl2-dev \
+    # USB & IMU hardware support
+    libusb-1.0-0 \
+    libusb-1.0-0-dev \
+    udev \
     # Audio (PulseAudio client only — server runs on host)
     libpulse0 \
     pulseaudio-utils \
@@ -118,8 +122,9 @@ ENV PULSE_SERVER=/run/pulse/native
 ENV USERNAME=pprz
 ENV USER_ID=1000
 RUN groupadd -f input \
+    && groupadd -f usb \
     && useradd --shell /bin/bash -u $USER_ID -o -c "Paparazzi Docker user" -m $USERNAME \
-    && usermod -aG sudo,dialout,plugdev,input $USERNAME
+    && usermod -aG sudo,dialout,plugdev,input,usb $USERNAME
 
 COPY docker/gazebo-classic/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
