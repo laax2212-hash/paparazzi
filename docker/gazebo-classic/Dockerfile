@@ -95,6 +95,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install Python dependencies matching the repo virtualenv requirements
 COPY requirements.txt /tmp/requirements.txt
 RUN python3 -m pip install --no-cache-dir --upgrade pip \
+    && python3 -m pip install --no-cache-dir 'empy==3.3.4' \
     && awk '!/^(PyQt5|PyQtWebEngine|pyqtgraph|scipy|pyserial|PyOpenGL|matplotlib)$/' /tmp/requirements.txt > /tmp/requirements.pip.txt \
     && python3 -m pip install --no-cache-dir -r /tmp/requirements.pip.txt \
     && printf '%s\n' \

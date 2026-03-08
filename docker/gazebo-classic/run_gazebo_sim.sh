@@ -57,7 +57,20 @@ X_OPTS=(
 GPU_OPTS=()
 if [ "$GPU_TYPE" = "nvidia" ]; then
     echo "[GPU] Using NVIDIA runtime"
-    GPU_OPTS+=(--gpus all --env NVIDIA_DRIVER_CAPABILITIES=all)
+    GPU_OPTS+=(--gpus all)
+    GPU_OPTS+=(--env NVIDIA_VISIBLE_DEVICES=all)
+    GPU_OPTS+=(--env NVIDIA_DRIVER_CAPABILITIES=all)
+    GPU_OPTS+=(--env __GLX_VENDOR_LIBRARY_NAME=nvidia)
+    GPU_OPTS+=(--env __NV_PRIME_RENDER_OFFLOAD=1)
+
+    # Pass DRM nodes when present (important for GLX/GUI apps)
+    if [ -d /dev/dri ]; then
+        GPU_OPTS+=(--device=/dev/dri)
+        RENDER_GID=$(getent group render 2>/dev/null | cut -d: -f3)
+        VIDEO_GID=$(getent group video  2>/dev/null | cut -d: -f3)
+        [ -n "$RENDER_GID" ] && GPU_OPTS+=(--group-add="$RENDER_GID") && echo "[GPU] Added render group (GID $RENDER_GID)"
+        [ -n "$VIDEO_GID"  ] && GPU_OPTS+=(--group-add="$VIDEO_GID")  && echo "[GPU] Added video  group (GID $VIDEO_GID)"
+    fi
 elif [ -d /dev/dri ]; then
     echo "[GPU] Using Mesa/Intel/AMD (DRI)"
     DRI_DEVICE_COUNT=0
