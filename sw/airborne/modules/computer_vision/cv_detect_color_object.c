@@ -1,31 +1,11 @@
 /*
  * Copyright (C) 2019 Kirk Scheper <kirkscheper@gmail.com>
  *
- * This file is part of Paparazzi.
- *
- * Paparazzi is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2, or (at your option)
- * any later version.
- *
- * Paparazzi is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Paparazzi; see the file COPYING.  If not, write to
- * the Free Software Foundation, 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Modified to support ROI masking for filter 1:
+ *   - filter 1: lower trapezoid ROI only
+ *   - filter 2: full frame
  */
 
-/**
- * @file modules/computer_vision/cv_detect_object.h
- * Assumes the object consists of a continuous color and checks
- * if you are over the defined object or not
- */
-
-// Own header
 #include "modules/computer_vision/cv_detect_color_object.h"
 #include "modules/computer_vision/cv.h"
 #include "modules/core/abi.h"
@@ -46,13 +26,12 @@
 static pthread_mutex_t mutex;
 
 #ifndef COLOR_OBJECT_DETECTOR_FPS1
-#define COLOR_OBJECT_DETECTOR_FPS1 0 ///< Default FPS (zero means run at camera fps)
+#define COLOR_OBJECT_DETECTOR_FPS1 0
 #endif
 #ifndef COLOR_OBJECT_DETECTOR_FPS2
-#define COLOR_OBJECT_DETECTOR_FPS2 0 ///< Default FPS (zero means run at camera fps)
+#define COLOR_OBJECT_DETECTOR_FPS2 0
 #endif
 
-// Filter Settings
 uint8_t cod_lum_min1 = 0;
 uint8_t cod_lum_max1 = 0;
 uint8_t cod_cb_min1 = 0;
@@ -70,7 +49,6 @@ uint8_t cod_cr_max2 = 0;
 bool cod_draw1 = false;
 bool cod_draw2 = false;
 
-// define global variables
 struct color_object_t {
   int32_t x_c;
   int32_t y_c;
@@ -79,18 +57,79 @@ struct color_object_t {
 };
 struct color_object_t global_filters[2];
 
-// Function
+/* New helpers */
+static bool pixel_in_lower_trapezoid(uint16_t x, uint16_t y, uint16_t img_w, uint16_t img_h);
+static bool pixel_on_lower_trapezoid_border(uint16_t x, uint16_t y, uint16_t img_w, uint16_t img_h);
+
 uint32_t find_object_centroid(struct image_t *img, int32_t* p_xc, int32_t* p_yc, bool draw,
                               uint8_t lum_min, uint8_t lum_max,
                               uint8_t cb_min, uint8_t cb_max,
-                              uint8_t cr_min, uint8_t cr_max);
+                              uint8_t cr_min, uint8_t cr_max,
+                              uint8_t filter);
 
 /*
- * object_detector
- * @param img - input image to process
- * @param filter - which detection filter to process
- * @return img
+ * Lower trapezoid ROI:
+ *   x from 0 to 0.45*img_w
+ *   top margin decreases linearly from 60 to 0.20*img_h
+ *   bottom margin mirrors the top
  */
+static bool pixel_in_lower_trapezoid(uint16_t x, uint16_t y, uint16_t img_w, uint16_t img_h)
+{
+  int col_end = (int)(0.45f * img_w);
+  int margin_start = 60;
+  int margin_end = (int)(0.20f * img_h);
+
+  if (col_end <= 0) {
+    return false;
+  }
+
+  if ((int)x < 0 || (int)x > col_end) {
+    return false;
+  }
+
+  float alpha = (float)x / (float)col_end;
+  float margin = (1.0f - alpha) * margin_start + alpha * margin_end;
+
+  int y_min = (int)roundf(margin);
+  int y_max = (int)roundf((float)img_h - margin);
+
+  return ((int)y >= y_min && (int)y <= y_max);
+}
+
+static bool pixel_on_lower_trapezoid_border(uint16_t x, uint16_t y, uint16_t img_w, uint16_t img_h)
+{
+  int col_end = (int)(0.45f * img_w);
+  int margin_start = 60;
+  int margin_end = (int)(0.20f * img_h);
+
+  if (col_end <= 0) {
+    return false;
+  }
+
+  if ((int)x < 0 || (int)x > col_end) {
+    return false;
+  }
+
+  float alpha = (float)x / (float)col_end;
+  float margin = (1.0f - alpha) * margin_start + alpha * margin_end;
+
+  int y_min = (int)roundf(margin);
+  int y_max = (int)roundf((float)img_h - margin);
+
+  /* border thickness = 1 pixel */
+  if ((int)x == 0 || (int)x == col_end) {
+    if ((int)y >= y_min && (int)y <= y_max) {
+      return true;
+    }
+  }
+
+  if (abs((int)y - y_min) <= 1 || abs((int)y - y_max) <= 1) {
+    return true;
+  }
+
+  return false;
+}
+
 static struct image_t *object_detector(struct image_t *img, uint8_t filter)
 {
   uint8_t lum_min, lum_max;
@@ -123,11 +162,9 @@ static struct image_t *object_detector(struct image_t *img, uint8_t filter)
 
   int32_t x_c, y_c;
 
-  // Filter and find centroid
-  uint32_t count = find_object_centroid(img, &x_c, &y_c, draw, lum_min, lum_max, cb_min, cb_max, cr_min, cr_max);
-  VERBOSE_PRINT("Color count %d: %u, threshold %u, x_c %d, y_c %d\n", camera, object_count, count_threshold, x_c, y_c);
-  VERBOSE_PRINT("centroid %d: (%d, %d) r: %4.2f a: %4.2f\n", camera, x_c, y_c,
-        hypotf(x_c, y_c) / hypotf(img->w * 0.5, img->h * 0.5), RadOfDeg(atan2f(y_c, x_c)));
+  uint32_t count = find_object_centroid(img, &x_c, &y_c, draw,
+                                        lum_min, lum_max, cb_min, cb_max, cr_min, cr_max,
+                                        filter);
 
   pthread_mutex_lock(&mutex);
   global_filters[filter-1].color_count = count;
@@ -155,6 +192,7 @@ void color_object_detector_init(void)
 {
   memset(global_filters, 0, 2*sizeof(struct color_object_t));
   pthread_mutex_init(&mutex, NULL);
+
 #ifdef COLOR_OBJECT_DETECTOR_CAMERA1
 #ifdef COLOR_OBJECT_DETECTOR_LUM_MIN1
   cod_lum_min1 = COLOR_OBJECT_DETECTOR_LUM_MIN1;
@@ -167,7 +205,6 @@ void color_object_detector_init(void)
 #ifdef COLOR_OBJECT_DETECTOR_DRAW1
   cod_draw1 = COLOR_OBJECT_DETECTOR_DRAW1;
 #endif
-
   cv_add_to_device(&COLOR_OBJECT_DETECTOR_CAMERA1, object_detector1, COLOR_OBJECT_DETECTOR_FPS1, 0);
 #endif
 
@@ -183,69 +220,64 @@ void color_object_detector_init(void)
 #ifdef COLOR_OBJECT_DETECTOR_DRAW2
   cod_draw2 = COLOR_OBJECT_DETECTOR_DRAW2;
 #endif
-
   cv_add_to_device(&COLOR_OBJECT_DETECTOR_CAMERA2, object_detector2, COLOR_OBJECT_DETECTOR_FPS2, 1);
 #endif
 }
 
-/*
- * find_object_centroid
- *
- * Finds the centroid of pixels in an image within filter bounds.
- * Also returns the amount of pixels that satisfy these filter bounds.
- *
- * @param img - input image to process formatted as YUV422.
- * @param p_xc - x coordinate of the centroid of color object
- * @param p_yc - y coordinate of the centroid of color object
- * @param lum_min - minimum y value for the filter in YCbCr colorspace
- * @param lum_max - maximum y value for the filter in YCbCr colorspace
- * @param cb_min - minimum cb value for the filter in YCbCr colorspace
- * @param cb_max - maximum cb value for the filter in YCbCr colorspace
- * @param cr_min - minimum cr value for the filter in YCbCr colorspace
- * @param cr_max - maximum cr value for the filter in YCbCr colorspace
- * @param draw - whether or not to draw on image
- * @return number of pixels of image within the filter bounds.
- */
 uint32_t find_object_centroid(struct image_t *img, int32_t* p_xc, int32_t* p_yc, bool draw,
                               uint8_t lum_min, uint8_t lum_max,
                               uint8_t cb_min, uint8_t cb_max,
-                              uint8_t cr_min, uint8_t cr_max)
+                              uint8_t cr_min, uint8_t cr_max,
+                              uint8_t filter)
 {
   uint32_t cnt = 0;
   uint32_t tot_x = 0;
   uint32_t tot_y = 0;
   uint8_t *buffer = img->buf;
 
-  // Go through all the pixels
   for (uint16_t y = 0; y < img->h; y++) {
-    for (uint16_t x = 0; x < img->w; x ++) {
-      // Check if the color is inside the specified values
+    for (uint16_t x = 0; x < img->w; x++) {
+
+      bool inside_roi = true;
+
+      /* filter 1 (orange): only count pixels inside trapezoid */
+      if (filter == 1) {
+        inside_roi = pixel_in_lower_trapezoid(x, y, img->w, img->h);
+      }
+
       uint8_t *yp, *up, *vp;
       if (x % 2 == 0) {
-        // Even x
-        up = &buffer[y * 2 * img->w + 2 * x];      // U
-        yp = &buffer[y * 2 * img->w + 2 * x + 1];  // Y1
-        vp = &buffer[y * 2 * img->w + 2 * x + 2];  // V
-        //yp = &buffer[y * 2 * img->w + 2 * x + 3]; // Y2
+        up = &buffer[y * 2 * img->w + 2 * x];
+        yp = &buffer[y * 2 * img->w + 2 * x + 1];
+        vp = &buffer[y * 2 * img->w + 2 * x + 2];
       } else {
-        // Uneven x
-        up = &buffer[y * 2 * img->w + 2 * x - 2];  // U
-        //yp = &buffer[y * 2 * img->w + 2 * x - 1]; // Y1
-        vp = &buffer[y * 2 * img->w + 2 * x];      // V
-        yp = &buffer[y * 2 * img->w + 2 * x + 1];  // Y2
+        up = &buffer[y * 2 * img->w + 2 * x - 2];
+        vp = &buffer[y * 2 * img->w + 2 * x];
+        yp = &buffer[y * 2 * img->w + 2 * x + 1];
       }
-      if ( (*yp >= lum_min) && (*yp <= lum_max) &&
-           (*up >= cb_min ) && (*up <= cb_max ) &&
-           (*vp >= cr_min ) && (*vp <= cr_max )) {
-        cnt ++;
+
+      /* draw trapezoid border for filter 1 */
+      if (draw && filter == 1 && pixel_on_lower_trapezoid_border(x, y, img->w, img->h)) {
+        *yp = 255;
+      }
+
+      if (!inside_roi) {
+        continue;
+      }
+
+      if ((*yp >= lum_min) && (*yp <= lum_max) &&
+          (*up >= cb_min)  && (*up <= cb_max)  &&
+          (*vp >= cr_min)  && (*vp <= cr_max)) {
+        cnt++;
         tot_x += x;
         tot_y += y;
-        if (draw){
-          *yp = 255;  // make pixel brighter in image
+        if (draw) {
+          *yp = 255;
         }
       }
     }
   }
+
   if (cnt > 0) {
     *p_xc = (int32_t)roundf(tot_x / ((float) cnt) - img->w * 0.5f);
     *p_yc = (int32_t)roundf(img->h * 0.5f - tot_y / ((float) cnt));
@@ -253,6 +285,7 @@ uint32_t find_object_centroid(struct image_t *img, int32_t* p_xc, int32_t* p_yc,
     *p_xc = 0;
     *p_yc = 0;
   }
+
   return cnt;
 }
 
@@ -264,13 +297,15 @@ void color_object_detector_periodic(void)
   pthread_mutex_unlock(&mutex);
 
   if(local_filters[0].updated){
-    AbiSendMsgVISUAL_DETECTION(COLOR_OBJECT_DETECTION1_ID, local_filters[0].x_c, local_filters[0].y_c,
-        0, 0, local_filters[0].color_count, 0);
+    AbiSendMsgVISUAL_DETECTION(COLOR_OBJECT_DETECTION1_ID,
+                               local_filters[0].x_c, local_filters[0].y_c,
+                               0, 0, local_filters[0].color_count, 0);
     local_filters[0].updated = false;
   }
   if(local_filters[1].updated){
-    AbiSendMsgVISUAL_DETECTION(COLOR_OBJECT_DETECTION2_ID, local_filters[1].x_c, local_filters[1].y_c,
-        0, 0, local_filters[1].color_count, 1);
+    AbiSendMsgVISUAL_DETECTION(COLOR_OBJECT_DETECTION2_ID,
+                               local_filters[1].x_c, local_filters[1].y_c,
+                               0, 0, local_filters[1].color_count, 1);
     local_filters[1].updated = false;
   }
 }

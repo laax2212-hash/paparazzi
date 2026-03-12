@@ -13,10 +13,10 @@
 #ifndef ORANGE_AVOIDER_H
 #define ORANGE_AVOIDER_H
 
-// settings
-extern float oa_color_count_frac;
+extern float oa_orange_obstacle_threshold;
+extern float oa_green_floor_threshold;
+extern float oa_green_plant_threshold;
 
-// functions
 extern void orange_avoider_init(void);
 extern void orange_avoider_periodic(void);
 
