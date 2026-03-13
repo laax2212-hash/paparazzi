@@ -1,4 +1,5 @@
 <program command="sw/simulator/pprzsim-launch" name="Simulator" icon="simulator.png">
   <arg constant="@AIRCRAFT" flag="-a" />
+  <arg constant="1" flag="--time_factor" />
 </program>
 

@@ -1,0 +1,54 @@
+<!DOCTYPE module SYSTEM "module.dtd">
+<module name="opticflow_avoider" dir="opticflow_avoider">
+  <doc>
+    <description>
+Optical-flow based obstacle avoidance for the front camera.
+Uses the size_divergence field from cv_opticflow to detect obstacles
+and the derotated lateral flow (flow_der_x) to choose which way to turn.
+
+State machine:
+  SAFE           - moving forward, watching divergence
+  OBSTACLE_FOUND - obstacle detected, choosing turn direction
+  TURNING        - turning away, waiting for divergence to drop
+
+Tunable parameters (adjustable from GCS Settings tab):
+  oa_divergence_threshold - divergence level that triggers avoidance
+  oa_flow_y_threshold     - absolute forward flow threshold that triggers avoidance
+  oa_turn_heading_deg     - degrees to turn when obstacle found
+  oa_move_distance        - forward step size (metres) each cycle
+    </description>
+    <define name="OPTICFLOW_AVOIDER_DIVERGENCE_THRESHOLD" value="0.30"
+            description="Divergence threshold for obstacle detection (default 0.30)"/>
+                <define name="OPTICFLOW_AVOIDER_FLOWY_THRESHOLD" value="45.0"
+                  description="Absolute forward optical flow threshold [subpixels] for obstacle detection (default 45)"/>
+        <define name="OPTICFLOW_AVOIDER_TURN_HEADING_DEG" value="18.0"
+          description="Heading change in degrees when avoiding (default 18)"/>
+    <define name="OPTICFLOW_AVOIDER_MOVE_DISTANCE" value="1.0"
+            description="Forward step distance in metres per cycle (default 1.0)"/>
+    <define name="OPTICFLOW_AVOIDER_ABI_ID" value="ABI_BROADCAST"
+            description="ABI sender ID to listen to (default: all senders)"/>
+  </doc>
+
+  <settings>
+    <dl_settings>
+      <dl_settings name="OpticflowAvoider">
+        <dl_setting var="oa_divergence_threshold" min="0.15" step="0.05" max="1.00" shortname="div_thresh"/>
+        <dl_setting var="oa_flow_y_threshold"     min="20"   step="5"    max="1000" shortname="flowy_thr"/>
+        <dl_setting var="oa_turn_heading_deg"     min="5.0"  step="5.0"  max="90.0" shortname="turn_deg"/>
+        <dl_setting var="oa_move_distance"        min="0.4"  step="0.2"  max="3.0"  shortname="move_dist"/>
+      </dl_settings>
+    </dl_settings>
+  </settings>
+
+  <header>
+    <file name="opticflow_avoider.h"/>
+  </header>
+
+  <init fun="opticflow_avoider_init()"/>
+  <periodic fun="opticflow_avoider_periodic()" freq="4"/>
+
+  <makefile target="ap|nps">
+    <file name="opticflow_avoider.c"/>
+  </makefile>
+
+</module>
