@@ -45,6 +45,7 @@
 #include "lib/encoding/jpeg.h"
 #include "lib/encoding/rtp.h"
 #include "udp_socket.h"
+#include "modules/core/abi.h"
 
 #include BOARD_CONFIG
 
@@ -106,6 +107,57 @@ struct viewvideo_t viewvideo = {
 #endif
 };
 
+/* Optical flow data storage */
+static float g_flow_x = 0.0f;
+static float g_flow_y = 0.0f;
+static float g_divergence = 0.0f;
+static abi_event opticflow_ev;
+
+static void opticflow_cb(uint8_t sender_id __attribute__((unused)),
+                         uint32_t stamp __attribute__((unused)),
+                         int16_t flow_x,
+                         int16_t flow_y,
+                         int16_t flow_der_x __attribute__((unused)),
+                         int16_t flow_der_y __attribute__((unused)),
+                         uint8_t quality __attribute__((unused)),
+                         float size_divergence)
+{
+  g_flow_x = (float)flow_x;
+  g_flow_y = (float)flow_y;
+  g_divergence = size_divergence;
+}
+
+
+/**
+ * Draw numeric overlay on image
+ * Position: 0=top-left, 1=top-center, 2=top-right
+ */
+static void draw_text_overlay(struct image_t *img, int x, int y, const char *text, uint8_t r, uint8_t g, uint8_t b)
+{
+  if (img->type != IMAGE_YUV422) {
+    return;
+  }
+
+  // Simple text rendering - just mark pixels
+  uint16_t len = strlen(text);
+  for (uint16_t i = 0; i < len && (x + i * 8) < img->w; i++) {
+    char c = text[i];
+    for (uint8_t row = 0; row < 8 && (y + row) < img->h; row++) {
+      for (uint8_t col = 0; col < 8; col++) {
+        if ((x + i * 8 + col) < img->w && (y + row) < img->h) {
+          uint16_t pixel_idx = ((y + row) * img->w + (x + i * 8 + col)) * 2;
+          img->buf[pixel_idx] = 200;
+          if (col % 2 == 0) {
+            img->buf[pixel_idx + 1] = (r > 127) ? 255 : 0;
+          } else {
+            img->buf[pixel_idx + 1] = (b > 127) ? 255 : 0;
+          }
+        }
+      }
+    }
+  }
+}
+
 /**
  * Handles all the video streaming and saving of the image shots
  * This is a separate thread, so it needs to be thread safe!
@@ -139,6 +191,17 @@ static struct image_t *viewvideo_function(struct UdpSocket *viewvideo_socket, st
 #endif
 
   if (viewvideo.is_streaming) {
+    // Draw optical flow overlays on the original image
+    char flow_str[32];
+    sprintf(flow_str, "X:%.1f", g_flow_x);
+    draw_text_overlay(img, 10, 10, flow_str, 255, 0, 0);
+
+    sprintf(flow_str, "Div:%.3f", g_divergence);
+    draw_text_overlay(img, img->w / 2 - 40, 10, flow_str, 0, 255, 0);
+
+    sprintf(flow_str, "Y:%.1f", g_flow_y);
+    draw_text_overlay(img, img->w - 100, 10, flow_str, 0, 0, 255);
+
     // Only resize when needed
     if (viewvideo.downsize_factor > 1) {
       image_yuv422_downsample(img, img_small, viewvideo.downsize_factor);
@@ -217,6 +280,9 @@ static struct image_t *viewvideo_function2(struct image_t *img, uint8_t camera_i
  */
 void viewvideo_init(void)
 {
+  // Subscribe to optical flow data
+  AbiBindMsgOPTICAL_FLOW(ABI_BROADCAST, &opticflow_ev, opticflow_cb);
+
   viewvideo.is_streaming = true;
 
   // safety check

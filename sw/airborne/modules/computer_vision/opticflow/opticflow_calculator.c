@@ -902,6 +902,8 @@ static struct flow_t *predict_flow_vectors(struct flow_t *flow_vectors, uint16_t
  */
 static void manage_flow_features(struct image_t *img, struct opticflow_t *opticflow, struct opticflow_result_t *result)
 {
+  uint8_t *yuv_buf = (uint8_t*)img->buf;
+
   // first check if corners have not moved too close together due to flow:
   int16_t c1 = 0;
   while (c1 < (int16_t)result->corner_cnt - 1) {
@@ -989,7 +991,19 @@ static void manage_flow_features(struct image_t *img, struct opticflow_t *opticf
           opticflow->fast9_ret_corners[result->corner_cnt].count = 0;
           opticflow->fast9_ret_corners[result->corner_cnt].x_sub = 0;
           opticflow->fast9_ret_corners[result->corner_cnt].y_sub = 0;
-          result->corner_cnt++;
+
+          // Check color criteria before adding the corner
+          uint32_t y_idx = (new_corners[j].y * img->w + new_corners[j].x) * 2 + 1;
+          uint32_t u_idx = (new_corners[j].y * img->w + (new_corners[j].x / 2) * 2);
+          uint32_t v_idx = (new_corners[j].y * img->w + (new_corners[j].x / 2) * 2 + 2);
+
+          uint8_t y = yuv_buf[y_idx];
+          uint8_t u = yuv_buf[u_idx];
+          uint8_t v = yuv_buf[v_idx];
+
+          if (is_orange(y,u,v) || is_green(y,u,v)) {
+            result->corner_cnt++;
+          }
 
           if (result->corner_cnt >= opticflow->fast9_rsize) {
             break;
@@ -1251,4 +1265,33 @@ static int cmp_array(const void *a, const void *b)
   const uint16_t *pa = (const uint16_t *)a;
   const uint16_t *pb = (const uint16_t *)b;
   return pa[0] - pb[0];
+}
+
+/* YUV color ranges for orange and green */
+#ifndef ORANGE_V_MIN
+#define ORANGE_V_MIN 6
+#endif
+#ifndef ORANGE_U_MIN
+#define ORANGE_U_MIN 2
+#endif
+#ifndef ORANGE_U_MAX
+#define ORANGE_U_MAX 14
+#endif
+
+#ifndef GREEN_V_MAX
+#define GREEN_V_MAX 8
+#endif
+#ifndef GREEN_U_MAX
+#define GREEN_U_MAX 8
+#endif
+#ifndef GREEN_Y_MIN
+#define GREEN_Y_MIN 80
+#endif
+
+static inline bool is_orange(uint8_t y, uint8_t u, uint8_t v) {
+  return v > ORANGE_V_MIN && u > ORANGE_U_MIN && u < ORANGE_U_MAX;
+}
+
+static inline bool is_green(uint8_t y, uint8_t u, uint8_t v) {
+  return v < GREEN_V_MAX && u < GREEN_U_MAX && y > GREEN_Y_MIN;
 }

@@ -12,6 +12,7 @@
       <define name="MT9V117_TARGET_FPS" value="20"/>
       <define name="OPTICFLOW_AVOIDER_DIVERGENCE_THRESHOLD" value="0.16"/>
       <define name="OPTICFLOW_AVOIDER_FLOWY_THRESHOLD"      value="45.0"/>
+      <define name="OPTICFLOW_AVOIDER_HIGH_FLOW_THRESHOLD"  value="30.0"/>
       <define name="OPTICFLOW_AVOIDER_TURN_HEADING_DEG"     value="18.0"/>
       <define name="OPTICFLOW_AVOIDER_MOVE_DISTANCE"        value="0.4"/>
       <module name="ahrs" type="int_cmpl_quat">
@@ -27,6 +28,7 @@
       <define name="LOGGER_FILE_PATH"   value="/tmp/paparazzi/log"/>
       <define name="OPTICFLOW_AVOIDER_DIVERGENCE_THRESHOLD" value="0.18"/>
       <define name="OPTICFLOW_AVOIDER_FLOWY_THRESHOLD"      value="45.0"/>
+      <define name="OPTICFLOW_AVOIDER_HIGH_FLOW_THRESHOLD"  value="30.0"/>
       <define name="OPTICFLOW_AVOIDER_TURN_HEADING_DEG"     value="18.0"/>
       <define name="OPTICFLOW_AVOIDER_MOVE_DISTANCE"        value="0.4"/>
       <module name="ahrs" type="float_mlkf">

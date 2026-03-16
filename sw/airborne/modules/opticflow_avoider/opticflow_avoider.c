@@ -59,6 +59,11 @@ float oa_move_distance = OPTICFLOW_AVOIDER_MOVE_DISTANCE;
 #endif
 float oa_flow_y_threshold = OPTICFLOW_AVOIDER_FLOWY_THRESHOLD;
 
+#ifndef OPTICFLOW_AVOIDER_HIGH_FLOW_THRESHOLD
+#define OPTICFLOW_AVOIDER_HIGH_FLOW_THRESHOLD 30.0f
+#endif
+float oa_high_flow_threshold = OPTICFLOW_AVOIDER_HIGH_FLOW_THRESHOLD;
+
 #define DIVERGENCE_CRITICAL_FACTOR   1.5f
 #define FLOW_DER_X_DEADBAND          2.0f
 #define DIVERGENCE_OBSTACLE_FACTOR   1.00f
@@ -299,8 +304,7 @@ void opticflow_avoider_periodic(void)
       navigation_state = OA_OBSTACLE_FOUND;
       break;
     }
-    float flow_slowdown = 1.0f - fminf(0.9f, flow_y_abs_lp / (oa_flow_y_threshold));
-    float forward_step = fmaxf(0.10f, fminf(oa_move_distance, 0.2f * obstacle_free_confidence) * flow_slowdown);
+    float forward_step = oa_move_distance;
     move_waypoint_forward(WP_GOAL, forward_step);
     break;
 
@@ -322,15 +326,13 @@ void opticflow_avoider_periodic(void)
   case OA_SEARCH_FOR_SAFE_HEADING:
     search_cycles++;
 
-    if (local_div > effective_threshold * DIVERGENCE_CRITICAL_FACTOR ||
-        flow_y_abs_lp > oa_flow_y_threshold * FLOWY_CRITICAL_FACTOR) {
-      move_waypoint_forward(WP_GOAL, -0.3f * oa_move_distance);
-      break;
+    if (flow_y_abs_lp > oa_high_flow_threshold) {
+      increase_nav_heading(last_turn_sign * oa_turn_heading_deg / 2.0f);
+    } else {
+      increase_nav_heading(last_turn_sign * oa_turn_heading_deg);
     }
 
-    increase_nav_heading(last_turn_sign * oa_turn_heading_deg);
-
-    move_waypoint_forward(WP_GOAL, -0.15f * oa_move_distance);
+    move_waypoint_forward(WP_GOAL, 0.15f * oa_move_distance); // Still move forward slowly to prevent getting stuck
 
     if (!obstacle_by_flow && !obstacle_by_flow_rise) {
       if (clear_cycles < 20) {
