@@ -73,9 +73,9 @@ uint32_t find_object_centroid(struct image_t *img, int32_t* p_xc, int32_t* p_yc,
 
 static bool pixel_in_lower_trapezoid(uint16_t x, uint16_t y, uint16_t img_w, uint16_t img_h)
 {
-  int col_end = (int)(0.45f * img_w);
-  int margin_start = 60;
-  int margin_end = (int)(0.20f * img_h);
+  int col_end = (int)(0.35f * img_w);
+  int margin_start = 80;
+  int margin_end = (int)(0.25f * img_h);
 
   if (col_end <= 0) {
     return false;
@@ -95,9 +95,9 @@ static bool pixel_in_lower_trapezoid(uint16_t x, uint16_t y, uint16_t img_w, uin
 
 static bool pixel_on_lower_trapezoid_border(uint16_t x, uint16_t y, uint16_t img_w, uint16_t img_h)
 {
-  int col_end = (int)(0.45f * img_w);
-  int margin_start = 60;
-  int margin_end = (int)(0.20f * img_h);
+  int col_end = (int)(0.35f * img_w);
+  int margin_start = 80;
+  int margin_end = (int)(0.25f * img_h);
 
   if (col_end <= 0) {
     return false;
@@ -123,7 +123,7 @@ static bool pixel_on_lower_trapezoid_border(uint16_t x, uint16_t y, uint16_t img
 
 static bool pixel_in_upper_rectangle(uint16_t x, uint16_t y, uint16_t img_w, uint16_t img_h)
 {
-  int x_min = (int)(0.60f * img_w);
+  int x_min = (int)(0.40f * img_w);
   int x_max = img_w - 1;
   int y_min = (int)(0.25f * img_h);
   int y_max = (int)(0.75f * img_h);
@@ -134,7 +134,7 @@ static bool pixel_in_upper_rectangle(uint16_t x, uint16_t y, uint16_t img_w, uin
 
 static bool pixel_on_upper_rectangle_border(uint16_t x, uint16_t y, uint16_t img_w, uint16_t img_h)
 {
-  int x_min = (int)(0.60f * img_w);
+  int x_min = (int)(0.40f * img_w);
   int x_max = img_w - 1;
   int y_min = (int)(0.25f * img_h);
   int y_max = (int)(0.75f * img_h);

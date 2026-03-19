@@ -32,9 +32,9 @@ enum navigation_state_t {
   OUT_OF_BOUNDS
 };
 
-float oa_orange_obstacle_threshold = 0.15f;
+float oa_orange_obstacle_threshold = 0.35f;
 float oa_green_floor_threshold     = 0.15f;
-float oa_green_plant_threshold     = 0.10f;
+float oa_green_plant_threshold     = 0.02f;
 
 enum navigation_state_t navigation_state = SAFE;
 float heading_increment = 5.f;
@@ -98,9 +98,9 @@ static void green_upper_detection_cb(uint8_t __attribute__((unused)) sender_id,
 
 static int32_t lower_trap_roi_pixels(int img_w, int img_h)
 {
-  int col_end      = (int)(0.45f * img_w);
-  int margin_start = 60;
-  int margin_end   = (int)(0.20f * img_h);
+  int col_end      = (int)(0.35f * img_w);
+  int margin_start = 80;
+  int margin_end   = (int)(0.25f * img_h);
 
   int b1 = img_h - 2 * margin_start;
   int b2 = img_h - 2 * margin_end;
@@ -114,7 +114,7 @@ static int32_t lower_trap_roi_pixels(int img_w, int img_h)
 
 static int32_t upper_sq_roi_pixels(int img_w, int img_h)
 {
-  int col_start = (int)(0.60f * img_w);
+  int col_start = (int)(0.40f * img_w);
   int col_end   = img_w;
   int row_start = (int)(0.25f * img_h);
   int row_end   = (int)(0.75f * img_h);
