@@ -32,6 +32,7 @@ ls /dev/dri/
 # If you card names are different, update them accordingly in run_gazebo_sim.sh
 ```
 
+
 **NVIDIA — requires nvidia-container-toolkit:**
 ```bash
 # Install NVIDIA Container Toolkit
@@ -83,6 +84,11 @@ cd paparazzi/docker/gazebo-classic
 
 # Option B: Launch Paparazzi Center directly
 ./run_gazebo_sim.sh ./paparazzi
+
+# Container name defaults to: pprz-gazebo-classic
+# (override with CONTAINER_NAME=your-name)
+# Example: open a second shell as root in the running container
+docker exec -it --user root pprz-gazebo-classic bash
 ```
 
 ### Step 4: Build and Run Simulation (inside the container)

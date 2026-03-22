@@ -12,6 +12,8 @@ The color filter settings are set using the cv_detect_color_object. This module 
 so you have to define which filter to use with the ORANGE_AVOIDER_VISUAL_DETECTION_ID setting.
     </description>
     <define name="ORANGE_AVOIDER_VISUAL_DETECTION_ID" value="ABI_BROADCAST" description="which VISUAL_DETECTION message to receive for orange pixel detection."/>
+  <define name="ORANGE_AVOIDER_CAMERA" value="front_camera|bottom_camera" description="Video device to use for OpenCV gate tracking"/>
+  <define name="ORANGE_AVOIDER_TRACKER_FPS" value="0" description="Gate-tracker processing frequency, 0 for camera rate"/>
   </doc>
     <settings>
     <dl_settings>
@@ -23,13 +25,59 @@ so you have to define which filter to use with the ORANGE_AVOIDER_VISUAL_DETECTI
   
   <dep>
     <depends>cv_detect_color_object</depends>
+    <depends>cv</depends>
   </dep>
   <header>
     <file name="orange_avoider.h"/>
   </header>
   <init fun="orange_avoider_init()"/>
   <periodic fun="orange_avoider_periodic()" freq="4"/>
-  <makefile target="ap|nps">
+  <makefile target="ap">
     <file name="orange_avoider.c"/>
+    <file name="orange_avoider_gate_tracker.cpp"/>
+    <flag name="CXXFLAGS" value="I$(PAPARAZZI_SRC)/sw/ext/opencv_bebop/install_arm/include/opencv4"/>
+
+    <flag name="LDFLAGS" value="L$(PAPARAZZI_HOME)/sw/ext/opencv_bebop/install_arm/lib"/>
+    <flag name="LDFLAGS" value="lopencv_world"/>
+    <flag name="LDFLAGS" value="L$(PAPARAZZI_HOME)/sw/ext/opencv_bebop/install_arm/lib/opencv4/3rdparty"/>
+    <flag name="LDFLAGS" value="llibprotobuf"/>
+    <flag name="LDFLAGS" value="llibjpeg-turbo"/>
+    <flag name="LDFLAGS" value="llibpng"/>
+    <flag name="LDFLAGS" value="llibtiff"/>
+    <flag name="LDFLAGS" value="llibopenjp2"/>
+    <flag name="LDFLAGS" value="lzlib"/>
+    <flag name="LDFLAGS" value="lade"/>
+    <flag name="LDFLAGS" value="ldl"/>
+    <flag name="LDFLAGS" value="lm"/>
+    <flag name="LDFLAGS" value="lpthread"/>
+    <flag name="LDFLAGS" value="lrt"/>
+  </makefile>
+  <makefile target="nps">
+    <file name="orange_avoider.c"/>
+    <file name="orange_avoider_gate_tracker.cpp"/>
+    <flag name="CXXFLAGS" value="I$(PAPARAZZI_SRC)/sw/ext/opencv_bebop/install_pc/include/opencv4"/>
+
+    <flag name="LDFLAGS" value="L$(PAPARAZZI_HOME)/sw/ext/opencv_bebop/install_pc/lib"/>
+    <flag name="LDFLAGS" value="lopencv_world"/>
+    <flag name="LDFLAGS" value="L$(PAPARAZZI_HOME)/sw/ext/opencv_bebop/install_pc/lib/opencv4/3rdparty"/>
+    <flag name="LDFLAGS" value="llibprotobuf"/>
+    <flag name="LDFLAGS" value="lade"/>
+    <flag name="LDFLAGS" value="L/usr/lib/x86_64-linux-gnu"/>
+    <flag name="LDFLAGS" value="ljpeg"/>
+    <flag name="LDFLAGS" value="lpng"/>
+    <flag name="LDFLAGS" value="ltiff"/>
+    <flag name="LDFLAGS" value="lopenjp2"/>
+    <flag name="LDFLAGS" value="L/usr/lib/x86_64-linux-gnu/hdf5/serial"/>
+    <flag name="LDFLAGS" value="lhdf5"/>
+    <flag name="LDFLAGS" value="lcrypto"/>
+    <flag name="LDFLAGS" value="lcurl"/>
+    <flag name="LDFLAGS" value="lpthread"/>
+    <flag name="LDFLAGS" value="lsz"/>
+    <flag name="LDFLAGS" value="lz"/>
+    <flag name="LDFLAGS" value="ldl"/>
+    <flag name="LDFLAGS" value="lm"/>
+    <flag name="LDFLAGS" value="lfreetype"/>
+    <flag name="LDFLAGS" value="lharfbuzz"/>
+    <flag name="LDFLAGS" value="lrt"/>
   </makefile>
 </module>

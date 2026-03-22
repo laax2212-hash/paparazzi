@@ -92,6 +92,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     vim \
     && rm -rf /var/lib/apt/lists/*
 
+RUN apt-get update && apt-get install -y libjpeg-turbo8-dev libpng-dev libtiff-dev zlib1g-dev libdc1394-dev && rm -rf /var/lib/apt/lists/*
+
 # Install Python dependencies matching the repo virtualenv requirements
 COPY requirements.txt /tmp/requirements.txt
 RUN python3 -m pip install --no-cache-dir --upgrade pip \

@@ -11,6 +11,7 @@
 #   DISABLE_JOYSTICK=1  - skip joystick passthrough
 #   DISABLE_AUDIO=1     - skip PulseAudio passthrough
 #   GPU_TYPE=nvidia      - use NVIDIA GPU (requires nvidia-container-toolkit)
+#   CONTAINER_NAME=name  - set Docker container name (default: pprz-gazebo-classic)
 #
 
 set -e
@@ -18,6 +19,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PAPARAZZI_SRC="$(readlink -m "$SCRIPT_DIR/../..")"
 IMAGE_NAME="paparazziuav/pprz-gazebo-classic"
+CONTAINER_NAME="${CONTAINER_NAME:-pprz-gazebo-classic}"
 PPRZ_HOME_CONTAINER="/home/pprz/paparazzi"
 
 # Default: interactive bash if no arguments
@@ -32,6 +34,7 @@ echo " Paparazzi + Gazebo Classic (Docker)"
 echo "============================================="
 echo " Paparazzi source: $PAPARAZZI_SRC"
 echo " Command: $CMD"
+echo " Container name: $CONTAINER_NAME"
 echo "============================================="
 
 # ── X11 Display Forwarding ───────────────────────────────────────────
@@ -149,6 +152,7 @@ echo ""
 echo "Starting container..."
 docker run \
     --rm -it \
+    --name "$CONTAINER_NAME" \
     --cap-add=SYS_NICE \
     --ulimit rtprio=99 \
     --env="NO_AT_BRIDGE=1" \

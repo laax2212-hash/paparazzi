@@ -22,6 +22,9 @@
 #include "generated/airframe.h"
 #include "state.h"
 #include "modules/core/abi.h"
+#include "modules/computer_vision/cv.h"
+#include "modules/computer_vision/lib/vision/image.h"
+#include "modules/orange_avoider/orange_avoider_gate_tracker.h"
 #include <time.h>
 #include <stdio.h>
 
@@ -41,6 +44,19 @@ static uint8_t calculateForwards(struct EnuCoor_i *new_coor, float distanceMeter
 static uint8_t moveWaypoint(uint8_t waypoint, struct EnuCoor_i *new_coor);
 static uint8_t increase_nav_heading(float incrementDegrees);
 static uint8_t chooseRandomIncrementAvoidance(void);
+static struct image_t *orange_avoider_gate_tracker_cb(struct image_t *img, uint8_t camera_id);
+
+#ifndef ORANGE_AVOIDER_TRACKER_FPS
+#define ORANGE_AVOIDER_TRACKER_FPS 0
+#endif
+
+#ifndef ORANGE_AVOIDER_GATE_TURN_GAIN
+#define ORANGE_AVOIDER_GATE_TURN_GAIN 2.5f
+#endif
+
+#ifndef ORANGE_AVOIDER_GATE_MAX_TURN_DEG
+#define ORANGE_AVOIDER_GATE_MAX_TURN_DEG 8.f
+#endif
 
 enum navigation_state_t {
   SAFE,
@@ -58,6 +74,12 @@ int32_t color_count = 0;                // orange color count from color filter 
 int16_t obstacle_free_confidence = 0;   // a measure of how certain we are that the way ahead is safe.
 float heading_increment = 5.f;          // heading angle increment [deg]
 float maxDistance = 2.25;               // max waypoint displacement [m]
+float oa_gate_distance_m = 0.f;
+float oa_gate_offset_m = 0.f;
+int32_t oa_gate_quality = 0;
+bool oa_gate_detected = false;
+int16_t oa_camera_width = 320;
+int16_t oa_camera_height = 240;
 
 const int16_t max_trajectory_confidence = 5; // number of consecutive negative object detections to be sure we are obstacle free
 
@@ -91,6 +113,31 @@ void orange_avoider_init(void)
 
   // bind our colorfilter callbacks to receive the color filter outputs
   AbiBindMsgVISUAL_DETECTION(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &color_detection_ev, color_detection_cb);
+
+#if defined(ORANGE_AVOIDER_CAMERA)
+  cv_add_to_device(&ORANGE_AVOIDER_CAMERA, orange_avoider_gate_tracker_cb, ORANGE_AVOIDER_TRACKER_FPS, 0);
+#endif
+}
+
+static struct image_t *orange_avoider_gate_tracker_cb(struct image_t *img, uint8_t __attribute__((unused)) camera_id)
+{
+  if (img == NULL || img->type != IMAGE_YUV422) {
+    return NULL;
+  }
+
+  int32_t quality = 0;
+  float distance_m = 0.f;
+  float offset_m = 0.f;
+  int ret = orange_avoider_gate_tracker_process((char *)img->buf, img->w, img->h, &quality, &distance_m, &offset_m);
+
+  oa_gate_quality = quality;
+  oa_gate_distance_m = distance_m;
+  oa_gate_offset_m = offset_m;
+  oa_gate_detected = (ret != 0);
+  oa_camera_width = img->w;
+  oa_camera_height = img->h;
+
+  return NULL;
 }
 
 /*
@@ -104,7 +151,7 @@ void orange_avoider_periodic(void)
   }
 
   // compute current color thresholds
-  int32_t color_count_threshold = oa_color_count_frac * front_camera.output_size.w * front_camera.output_size.h;
+  int32_t color_count_threshold = oa_color_count_frac * oa_camera_width * oa_camera_height;
 
   VERBOSE_PRINT("Color_count: %d  threshold: %d state: %d \n", color_count, color_count_threshold, navigation_state);
 
@@ -122,6 +169,12 @@ void orange_avoider_periodic(void)
 
   switch (navigation_state){
     case SAFE:
+      if (oa_gate_detected) {
+        float gate_heading_correction = -oa_gate_offset_m * ORANGE_AVOIDER_GATE_TURN_GAIN;
+        BoundAbs(gate_heading_correction, ORANGE_AVOIDER_GATE_MAX_TURN_DEG);
+        increase_nav_heading(gate_heading_correction);
+      }
+
       // Move waypoint forward
       moveWaypointForward(WP_TRAJECTORY, 1.5f * moveDistance);
       if (!InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
