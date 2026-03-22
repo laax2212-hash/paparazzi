@@ -44,7 +44,9 @@ static uint8_t calculateForwards(struct EnuCoor_i *new_coor, float distanceMeter
 static uint8_t moveWaypoint(uint8_t waypoint, struct EnuCoor_i *new_coor);
 static uint8_t increase_nav_heading(float incrementDegrees);
 static uint8_t chooseRandomIncrementAvoidance(void);
+#if defined(ORANGE_AVOIDER_CAMERA)
 static struct image_t *orange_avoider_gate_tracker_cb(struct image_t *img, uint8_t camera_id);
+#endif
 
 #ifndef ORANGE_AVOIDER_TRACKER_FPS
 #define ORANGE_AVOIDER_TRACKER_FPS 0
@@ -119,6 +121,7 @@ void orange_avoider_init(void)
 #endif
 }
 
+#if defined(ORANGE_AVOIDER_CAMERA)
 static struct image_t *orange_avoider_gate_tracker_cb(struct image_t *img, uint8_t __attribute__((unused)) camera_id)
 {
   if (img == NULL || img->type != IMAGE_YUV422) {
@@ -139,6 +142,7 @@ static struct image_t *orange_avoider_gate_tracker_cb(struct image_t *img, uint8
 
   return NULL;
 }
+#endif
 
 /*
  * Function that checks it is safe to move forwards, and then moves a waypoint forward or changes the heading

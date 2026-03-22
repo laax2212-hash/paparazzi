@@ -11,9 +11,38 @@
 #include <limits>
 #include <vector>
 
-#include <opencv2/core/core.hpp>
-#include <opencv2/calib3d/calib3d.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
+#if defined(ORANGE_AVOIDER_FORCE_NO_OPENCV)
+#define ORANGE_AVOIDER_HAVE_OPENCV 0
+#elif __has_include(<opencv2/opencv.hpp>)
+#define ORANGE_AVOIDER_HAVE_OPENCV 1
+#include <opencv2/opencv.hpp>
+#elif __has_include(<opencv4/opencv2/opencv.hpp>)
+#define ORANGE_AVOIDER_HAVE_OPENCV 1
+#include <opencv4/opencv2/opencv.hpp>
+#else
+#define ORANGE_AVOIDER_HAVE_OPENCV 0
+#endif
+
+#if !ORANGE_AVOIDER_HAVE_OPENCV
+int orange_avoider_gate_tracker_process(char *img, int width, int height,
+                                        int32_t *quality, float *distance_m, float *offset_m)
+{
+  (void)img;
+  (void)width;
+  (void)height;
+  if (quality != nullptr) {
+    *quality = 0;
+  }
+  if (distance_m != nullptr) {
+    *distance_m = 0.f;
+  }
+  if (offset_m != nullptr) {
+    *offset_m = 0.f;
+  }
+  return 0;
+}
+
+#else
 
 struct OaBanner {
   int cx;
@@ -171,3 +200,5 @@ int orange_avoider_gate_tracker_process(char *img, int width, int height,
 
   return 1;
 }
+
+#endif
