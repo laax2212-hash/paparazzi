@@ -35,12 +35,42 @@ so you have to define which filter to use with the ORANGE_AVOIDER_VISUAL_DETECTI
     <file name="orange_avoider.c"/>
     <file name="orange_avoider_gate_tracker.cpp"/>
     <raw>
-      ifneq (,$(wildcard $(PAPARAZZI_HOME)/sw/ext/opencv_bebop/install_arm/lib/libopencv_world*))
+      OPENCV_ARM_ROOT := $(PAPARAZZI_HOME)/sw/ext/opencv_bebop/install_arm
+      OPENCV_ARM_LIB  := $(OPENCV_ARM_ROOT)/lib
+      OPENCV_ARM_3P   := $(OPENCV_ARM_LIB)/opencv4/3rdparty
+
+      ifneq (,$(wildcard $(OPENCV_ARM_LIB)/libopencv_world*))
         ap.CXXFLAGS += -I$(PAPARAZZI_SRC)/sw/ext/opencv_bebop/install_arm/include/opencv4
-        ap.LDFLAGS  += -L$(PAPARAZZI_HOME)/sw/ext/opencv_bebop/install_arm/lib
+        ap.LDFLAGS  += -L$(OPENCV_ARM_LIB)
         ap.LDFLAGS  += -lopencv_world
-        ap.LDFLAGS  += -L$(PAPARAZZI_HOME)/sw/ext/opencv_bebop/install_arm/lib/opencv4/3rdparty
-        ap.LDFLAGS  += -lprotobuf -ljpeg -lpng -ltiff -lopenjp2 -lz -ldl -lm -lpthread -lrt
+
+        OCV_PROTOBUF := $(firstword $(wildcard $(OPENCV_ARM_3P)/libprotobuf*.a $(OPENCV_ARM_LIB)/libprotobuf*.a))
+        OCV_JPEG     := $(firstword $(wildcard $(OPENCV_ARM_3P)/libjpeg*.a $(OPENCV_ARM_3P)/liblibjpeg*.a $(OPENCV_ARM_LIB)/libjpeg*.a $(OPENCV_ARM_LIB)/liblibjpeg*.a))
+        OCV_PNG      := $(firstword $(wildcard $(OPENCV_ARM_3P)/libpng*.a $(OPENCV_ARM_3P)/liblibpng*.a $(OPENCV_ARM_LIB)/libpng*.a $(OPENCV_ARM_LIB)/liblibpng*.a))
+        OCV_TIFF     := $(firstword $(wildcard $(OPENCV_ARM_3P)/libtiff*.a $(OPENCV_ARM_3P)/liblibtiff*.a $(OPENCV_ARM_LIB)/libtiff*.a $(OPENCV_ARM_LIB)/liblibtiff*.a))
+        OCV_OPENJP2  := $(firstword $(wildcard $(OPENCV_ARM_3P)/libopenjp2*.a $(OPENCV_ARM_3P)/liblibopenjp2*.a $(OPENCV_ARM_LIB)/libopenjp2*.a $(OPENCV_ARM_LIB)/liblibopenjp2*.a))
+        OCV_ZLIB     := $(firstword $(wildcard $(OPENCV_ARM_3P)/libzlib*.a $(OPENCV_ARM_3P)/libz*.a $(OPENCV_ARM_LIB)/libzlib*.a $(OPENCV_ARM_LIB)/libz*.a))
+
+        ifneq ($(OCV_PROTOBUF),)
+          ap.LDFLAGS += $(OCV_PROTOBUF)
+        endif
+        ifneq ($(OCV_JPEG),)
+          ap.LDFLAGS += $(OCV_JPEG)
+        endif
+        ifneq ($(OCV_PNG),)
+          ap.LDFLAGS += $(OCV_PNG)
+        endif
+        ifneq ($(OCV_TIFF),)
+          ap.LDFLAGS += $(OCV_TIFF)
+        endif
+        ifneq ($(OCV_OPENJP2),)
+          ap.LDFLAGS += $(OCV_OPENJP2)
+        endif
+        ifneq ($(OCV_ZLIB),)
+          ap.LDFLAGS += $(OCV_ZLIB)
+        endif
+
+        ap.LDFLAGS  += -ldl -lm -lpthread -lrt
       else
         ap.CXXFLAGS += -DORANGE_AVOIDER_FORCE_NO_OPENCV
         $(warning orange_avoider: ARM OpenCV not found in sw/ext/opencv_bebop/install_arm, using fallback tracker for AP)
