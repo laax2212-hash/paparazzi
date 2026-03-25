@@ -16,6 +16,8 @@
 extern float oa_orange_obstacle_threshold;
 extern float oa_green_floor_threshold;
 extern float oa_green_plant_threshold;
+extern float oa_gate_heading_gain;
+extern float oa_gate_approach_speed;
 
 extern void orange_avoider_init(void);
 extern void orange_avoider_periodic(void);

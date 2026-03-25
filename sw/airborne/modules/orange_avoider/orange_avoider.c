@@ -8,6 +8,10 @@
 #include <math.h>
 #include <stdbool.h>
 
+#include "modules/computer_vision/cv.h"
+#include "modules/orange_avoider/gate_tracker.h"
+#include "pthread.h"
+
 #include "generated/flight_plan.h"
 
 #define ORANGE_AVOIDER_VERBOSE TRUE
@@ -29,12 +33,15 @@ enum navigation_state_t {
   SAFE,
   OBSTACLE_FOUND,
   SEARCH_FOR_SAFE_HEADING,
-  OUT_OF_BOUNDS
+  OUT_OF_BOUNDS,
+  GATE_DETECTED
 };
 
 float oa_orange_obstacle_threshold = 0.35f;
 float oa_green_floor_threshold     = 0.15f;
 float oa_green_plant_threshold     = 0.02f;
+float oa_gate_heading_gain         = 0.5f;    // fraction of angular error corrected per step
+float oa_gate_approach_speed       = 1.5f;    // waypoint advance distance when approaching gate [m]
 
 enum navigation_state_t navigation_state = SAFE;
 float heading_increment = 5.f;
@@ -42,6 +49,23 @@ float maxDistance = 2.25f;
 int16_t obstacle_free_confidence = 0;
 
 const int16_t max_trajectory_confidence = 5;
+
+/*
+ * Gate tracker state (written by video thread, read by periodic)
+ */
+static pthread_mutex_t gate_mutex;
+static int    gt_detected   = 0;
+static float  gt_distance_m = 0.f;
+static float  gt_offset_m   = 0.f;
+static int16_t gate_confidence = 0;
+static const int16_t max_gate_confidence = 5;
+
+#ifndef GATE_TRACKER_CAMERA
+#define GATE_TRACKER_CAMERA front_camera
+#endif
+#ifndef GATE_TRACKER_FPS
+#define GATE_TRACKER_FPS 0
+#endif
 
 static int32_t orange_lower_count = 0;
 static int32_t green_lower_count  = 0;
@@ -94,6 +118,30 @@ static void green_upper_detection_cb(uint8_t __attribute__((unused)) sender_id,
                                      int16_t __attribute__((unused)) extra)
 {
   green_upper_count = quality;
+}
+
+/*
+ * Gate tracker video callback – runs in the video thread
+ */
+static struct image_t *gate_tracker_cv(struct image_t *img, uint8_t camera_id);
+static struct image_t *gate_tracker_cv(struct image_t *img, uint8_t camera_id __attribute__((unused)))
+{
+  if (img->type != IMAGE_YUV422) {
+    return img;
+  }
+
+  int32_t quality;
+  float distance, offset;
+  int result = gate_tracker_process((char *)img->buf, img->w, img->h,
+                                    &quality, &distance, &offset);
+
+  pthread_mutex_lock(&gate_mutex);
+  gt_detected   = result;
+  gt_distance_m = distance;
+  gt_offset_m   = offset;
+  pthread_mutex_unlock(&gate_mutex);
+
+  return img;
 }
 
 static int32_t lower_trap_roi_pixels(int img_w, int img_h)
@@ -161,6 +209,10 @@ void orange_avoider_init(void)
   AbiBindMsgVISUAL_DETECTION(GREEN_UPPER_VISUAL_DETECTION_ID,
                              &green_upper_detection_ev,
                              green_upper_detection_cb);
+
+  // Gate tracker: register CV callback on the video thread
+  pthread_mutex_init(&gate_mutex, NULL);
+  cv_add_to_device(&GATE_TRACKER_CAMERA, gate_tracker_cv, GATE_TRACKER_FPS, 0);
 }
 
 void orange_avoider_periodic(void)
@@ -185,10 +237,30 @@ void orange_avoider_periodic(void)
 
   bool obstacle_detected = orange_obstacle || no_floor || plant_obstacle;
 
+  // Read gate tracker results (thread-safe)
+  int local_gate_detected;
+  float local_gate_distance, local_gate_offset;
+  pthread_mutex_lock(&gate_mutex);
+  local_gate_detected = gt_detected;
+  local_gate_distance = gt_distance_m;
+  local_gate_offset   = gt_offset_m;
+  pthread_mutex_unlock(&gate_mutex);
+
+  // Update gate confidence
+  if (local_gate_detected) {
+    if (gate_confidence < max_gate_confidence) {
+      gate_confidence++;
+    }
+  } else {
+    if (gate_confidence > 0) {
+      gate_confidence--;
+    }
+  }
+
   VERBOSE_PRINT(
     "orange_lower=%ld green_lower=%ld green_upper=%ld | "
     "orange_ratio=%.4f green_lower_ratio=%.4f green_upper_ratio=%.4f | "
-    "orange_obs=%d no_floor=%d plant=%d conf=%d state=%d\n",
+    "orange_obs=%d no_floor=%d plant=%d conf=%d gate_conf=%d gate_dist=%.2f gate_off=%.2f state=%d\n",
     (long)orange_lower_count,
     (long)green_lower_count,
     (long)green_upper_count,
@@ -199,6 +271,9 @@ void orange_avoider_periodic(void)
     no_floor,
     plant_obstacle,
     obstacle_free_confidence,
+    gate_confidence,
+    local_gate_distance,
+    local_gate_offset,
     navigation_state
   );
 
@@ -214,6 +289,12 @@ void orange_avoider_periodic(void)
 
   switch (navigation_state) {
     case SAFE:
+      // If gate detected with enough confidence, switch to gate approach
+      if (gate_confidence >= 2) {
+        navigation_state = GATE_DETECTED;
+        break;
+      }
+
       moveWaypointForward(WP_TRAJECTORY, 1.5f * moveDistance);
 
       if (!InsideObstacleZone(WaypointX(WP_TRAJECTORY), WaypointY(WP_TRAJECTORY))) {
@@ -224,6 +305,41 @@ void orange_avoider_periodic(void)
         moveWaypointForward(WP_GOAL, moveDistance);
         moveWaypointForward(WP_RETREAT, -1.0f * moveDistance);
       }
+      break;
+
+    case GATE_DETECTED:
+      // Gate lost – return to normal avoidance
+      if (gate_confidence <= 0) {
+        navigation_state = SAFE;
+        break;
+      }
+
+      // Respect arena bounds
+      moveWaypointForward(WP_TRAJECTORY, 1.5f * oa_gate_approach_speed);
+      if (!InsideObstacleZone(WaypointX(WP_TRAJECTORY), WaypointY(WP_TRAJECTORY))) {
+        navigation_state = OUT_OF_BOUNDS;
+        break;
+      }
+
+      // Steer toward gate centre
+      {
+        float safe_dist = fmaxf(local_gate_distance, 0.1f);
+        float angle_to_gate_deg = DegOfRad(atan2f(local_gate_offset, safe_dist));
+        float correction = oa_gate_heading_gain * angle_to_gate_deg;
+
+        // Clamp to prevent wild oscillations
+        if (correction >  15.f) { correction =  15.f; }
+        if (correction < -15.f) { correction = -15.f; }
+
+        increase_nav_heading(correction);
+      }
+
+      // Advance toward gate
+      moveWaypointForward(WP_GOAL, oa_gate_approach_speed);
+      moveWaypointForward(WP_RETREAT, -1.0f * oa_gate_approach_speed);
+
+      VERBOSE_PRINT("GATE APPROACH: dist=%.2f offset=%.2f conf=%d\n",
+                    local_gate_distance, local_gate_offset, gate_confidence);
       break;
 
     case OBSTACLE_FOUND:

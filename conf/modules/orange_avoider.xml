@@ -3,36 +3,87 @@
 <module name="orange_avoider">
   <doc>
     <description>
-This module is an example module for the course AE4317 Autonomous Flight of Micro Air Vehicles at the TU Delft.
-This module is used in combination with a color filter (cv_detect_color_object) and the navigation mode of the autopilot.
-The avoidance strategy is to simply count the total number of orange pixels. When above a certain percentage threshold,
-(given by color_count_frac) we assume that there is an obstacle and we turn.
+Orange avoider with gate tracker.
+Combines colour-based obstacle avoidance with blue-gate detection using OpenCV solvePnP.
+When a gate (two horizontal blue banners stacked vertically) is detected, the drone
+steers toward its centre and flies through it.  Otherwise it avoids orange obstacles
+and stays inside the arena using floor colour detection.
 
-The color filter settings are set using the cv_detect_color_object. This module can run multiple filters simultaneously
-so you have to define which filter to use with the ORANGE_AVOIDER_VISUAL_DETECTION_ID setting.
+Requires sw/ext/opencv_bebop to be compiled for the AP (Bebop) target.
     </description>
     <define name="ORANGE_AVOIDER_VISUAL_DETECTION_ID" value="ABI_BROADCAST" description="which VISUAL_DETECTION message to receive for orange pixel detection."/>
+    <define name="GATE_TRACKER_CAMERA" value="front_camera" description="Camera device for gate tracker"/>
+    <define name="GATE_TRACKER_FPS" value="0" description="Gate tracker max FPS (0 = camera rate)"/>
   </doc>
 
   <settings>
   <dl_settings>
     <dl_settings name="OrangeAvoider">
-       <dl_setting var="oa_orange_obstacle_threshold" min="0" step="0.01" max="1"/>
-       <dl_setting var="oa_green_floor_threshold" min="0" step="0.01" max="1"/>
-       <dl_setting var="oa_green_plant_threshold" min="0" step="0.01" max="1"/>
+       <dl_setting var="oa_orange_obstacle_threshold" min="0" step="0.01" max="1" shortname="orange_thr"/>
+       <dl_setting var="oa_green_floor_threshold" min="0" step="0.01" max="1" shortname="floor_thr"/>
+       <dl_setting var="oa_green_plant_threshold" min="0" step="0.01" max="1" shortname="plant_thr"/>
+       <dl_setting var="oa_gate_heading_gain" min="0" step="0.05" max="2" shortname="gate_gain"/>
+       <dl_setting var="oa_gate_approach_speed" min="0" step="0.1" max="3" shortname="gate_speed"/>
       </dl_settings>
     </dl_settings>
   </settings>
-  
+
   <dep>
-    <depends>cv_detect_color_object</depends>
+    <depends>cv_detect_color_object,video_thread</depends>
   </dep>
   <header>
     <file name="orange_avoider.h"/>
   </header>
   <init fun="orange_avoider_init()"/>
   <periodic fun="orange_avoider_periodic()" freq="4"/>
-  <makefile target="ap|nps">
+
+  <!-- Bebop (ARM cross-compiled OpenCV from sw/ext/opencv_bebop) -->
+  <makefile target="ap">
     <file name="orange_avoider.c"/>
+    <file name="gate_tracker.cpp"/>
+    <flag name="CXXFLAGS" value="I$(PAPARAZZI_SRC)/sw/ext/opencv_bebop/install_arm/include/opencv4"/>
+    <flag name="LDFLAGS" value="L$(PAPARAZZI_HOME)/sw/ext/opencv_bebop/install_arm/lib"/>
+    <flag name="LDFLAGS" value="lopencv_world"/>
+    <flag name="LDFLAGS" value="L$(PAPARAZZI_HOME)/sw/ext/opencv_bebop/install_arm/lib/opencv4/3rdparty"/>
+    <flag name="LDFLAGS" value="llibprotobuf"/>
+    <flag name="LDFLAGS" value="llibjpeg-turbo"/>
+    <flag name="LDFLAGS" value="llibpng"/>
+    <flag name="LDFLAGS" value="llibtiff"/>
+    <flag name="LDFLAGS" value="llibopenjp2"/>
+    <flag name="LDFLAGS" value="lzlib"/>
+    <flag name="LDFLAGS" value="lade"/>
+    <flag name="LDFLAGS" value="ldl"/>
+    <flag name="LDFLAGS" value="lm"/>
+    <flag name="LDFLAGS" value="lpthread"/>
+    <flag name="LDFLAGS" value="lrt"/>
+  </makefile>
+
+  <!-- Simulation (native OpenCV from sw/ext/opencv_bebop/install_pc or system) -->
+  <makefile target="nps">
+    <file name="orange_avoider.c"/>
+    <file name="gate_tracker.cpp"/>
+    <flag name="CXXFLAGS" value="I$(PAPARAZZI_SRC)/sw/ext/opencv_bebop/install_pc/include/opencv4"/>
+    <flag name="LDFLAGS" value="L$(PAPARAZZI_HOME)/sw/ext/opencv_bebop/install_pc/lib"/>
+    <flag name="LDFLAGS" value="lopencv_world"/>
+    <flag name="LDFLAGS" value="L$(PAPARAZZI_HOME)/sw/ext/opencv_bebop/install_pc/lib/opencv4/3rdparty"/>
+    <flag name="LDFLAGS" value="llibprotobuf"/>
+    <flag name="LDFLAGS" value="lade"/>
+    <flag name="LDFLAGS" value="L/usr/lib/x86_64-linux-gnu"/>
+    <flag name="LDFLAGS" value="ljpeg"/>
+    <flag name="LDFLAGS" value="lpng"/>
+    <flag name="LDFLAGS" value="ltiff"/>
+    <flag name="LDFLAGS" value="lopenjp2"/>
+    <flag name="LDFLAGS" value="L/usr/lib/x86_64-linux-gnu/hdf5/serial"/>
+    <flag name="LDFLAGS" value="lhdf5"/>
+    <flag name="LDFLAGS" value="lcrypto"/>
+    <flag name="LDFLAGS" value="lcurl"/>
+    <flag name="LDFLAGS" value="lpthread"/>
+    <flag name="LDFLAGS" value="lsz"/>
+    <flag name="LDFLAGS" value="lz"/>
+    <flag name="LDFLAGS" value="ldl"/>
+    <flag name="LDFLAGS" value="lm"/>
+    <flag name="LDFLAGS" value="lfreetype"/>
+    <flag name="LDFLAGS" value="lharfbuzz"/>
+    <flag name="LDFLAGS" value="lrt"/>
   </makefile>
 </module>
