@@ -63,6 +63,14 @@
         <dl_setting var="cod_cr_min3"  min="0" step="1" max="255" shortname="v_min3"/>
         <dl_setting var="cod_cr_max3"  min="0" step="1" max="255" shortname="v_max3"/>
         <dl_setting var="cod_draw3"    min="0" step="1" max="1" values="False|True" shortname="draw 3"/>
+
+        <dl_setting var="cod_lum_min4" min="0" step="1" max="255" shortname="y_min4"/>
+        <dl_setting var="cod_lum_max4" min="0" step="1" max="255" shortname="y_max4"/>
+        <dl_setting var="cod_cb_min4"  min="0" step="1" max="255" shortname="u_min4"/>
+        <dl_setting var="cod_cb_max4"  min="0" step="1" max="255" shortname="u_max4"/>
+        <dl_setting var="cod_cr_min4"  min="0" step="1" max="255" shortname="v_min4"/>
+        <dl_setting var="cod_cr_max4"  min="0" step="1" max="255" shortname="v_max4"/>
+        <dl_setting var="cod_draw4"    min="0" step="1" max="1" values="False|True" shortname="draw 4"/>
       </dl_settings>
     </dl_settings>
   </settings>

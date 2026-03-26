@@ -39,16 +39,20 @@ static pthread_mutex_t mutex;
 #ifndef COLOR_OBJECT_DETECTION3_ID
 #define COLOR_OBJECT_DETECTION3_ID 30
 #endif
-
+#ifndef COLOR_OBJECT_DETECTION4_ID
+#define COLOR_OBJECT_DETECTION4_ID 4
+#endif
 
 /* Filter settings */
 uint8_t cod_lum_min1 = 0, cod_lum_max1 = 0, cod_cb_min1 = 0, cod_cb_max1 = 0, cod_cr_min1 = 0, cod_cr_max1 = 0;
 uint8_t cod_lum_min2 = 0, cod_lum_max2 = 0, cod_cb_min2 = 0, cod_cb_max2 = 0, cod_cr_min2 = 0, cod_cr_max2 = 0;
 uint8_t cod_lum_min3 = 0, cod_lum_max3 = 0, cod_cb_min3 = 0, cod_cb_max3 = 0, cod_cr_min3 = 0, cod_cr_max3 = 0;
+uint8_t cod_lum_min4 = 0, cod_lum_max4 = 0, cod_cb_min4 = 0, cod_cb_max4 = 0, cod_cr_min4 = 0, cod_cr_max4 = 0;
 
 bool cod_draw1 = false;
 bool cod_draw2 = false;
 bool cod_draw3 = false;
+bool cod_draw4 = false;
 
 struct color_object_t {
   int32_t x_c;
@@ -57,7 +61,7 @@ struct color_object_t {
   bool updated;
 };
 
-struct color_object_t global_filters[3];
+struct color_object_t global_filters[4];
 
 /* ROI helpers */
 static bool pixel_in_lower_trapezoid(uint16_t x, uint16_t y, uint16_t img_w, uint16_t img_h);
@@ -171,6 +175,12 @@ static struct image_t *object_detector(struct image_t *img, uint8_t filter)
       cr_min  = cod_cr_min3;  cr_max  = cod_cr_max3;
       draw = cod_draw3;
       break;
+    case 4:
+      lum_min = cod_lum_min4; lum_max = cod_lum_max4;
+      cb_min  = cod_cb_min4;  cb_max  = cod_cb_max4;
+      cr_min  = cod_cr_min4;  cr_max  = cod_cr_max4;
+      draw = cod_draw4;
+      break;
     default:
       return img;
   }
@@ -208,9 +218,15 @@ struct image_t *object_detector3(struct image_t *img, uint8_t camera_id __attrib
   return object_detector(img, 3);
 }
 
+struct image_t *object_detector4(struct image_t *img, uint8_t camera_id);
+struct image_t *object_detector4(struct image_t *img, uint8_t camera_id __attribute__((unused)))
+{
+  return object_detector(img, 4);
+}
+
 void color_object_detector_init(void)
 {
-  memset(global_filters, 0, 3 * sizeof(struct color_object_t));
+  memset(global_filters, 0, 4* sizeof(struct color_object_t));
   pthread_mutex_init(&mutex, NULL);
 
 #ifdef COLOR_OBJECT_DETECTOR_CAMERA1
@@ -257,6 +273,22 @@ void color_object_detector_init(void)
 #endif
   cv_add_to_device(&COLOR_OBJECT_DETECTOR_CAMERA3, object_detector3, COLOR_OBJECT_DETECTOR_FPS3, 2);
 #endif
+
+#ifdef COLOR_OBJECT_DETECTOR_CAMERA4
+#ifdef COLOR_OBJECT_DETECTOR_LUM_MIN4
+  cod_lum_min4 = COLOR_OBJECT_DETECTOR_LUM_MIN4;
+  cod_lum_max4 = COLOR_OBJECT_DETECTOR_LUM_MAX4;
+  cod_cb_min4  = COLOR_OBJECT_DETECTOR_CB_MIN4;
+  cod_cb_max4  = COLOR_OBJECT_DETECTOR_CB_MAX4;
+  cod_cr_min4  = COLOR_OBJECT_DETECTOR_CR_MIN4;
+  cod_cr_max4  = COLOR_OBJECT_DETECTOR_CR_MAX4;
+#endif
+#ifdef COLOR_OBJECT_DETECTOR_DRAW4
+  cod_draw4 = COLOR_OBJECT_DETECTOR_DRAW4;
+#endif
+  // This registers the 4th filter function
+  cv_add_to_device(&COLOR_OBJECT_DETECTOR_CAMERA4, object_detector4, COLOR_OBJECT_DETECTOR_FPS4, 3);
+#endif
 }
 
 uint32_t find_object_centroid(struct image_t *img, int32_t* p_xc, int32_t* p_yc, bool draw,
@@ -277,7 +309,7 @@ uint32_t find_object_centroid(struct image_t *img, int32_t* p_xc, int32_t* p_yc,
 
       if (filter == 1 || filter == 2) {
         inside_roi = pixel_in_lower_trapezoid(x, y, img->w, img->h);
-      } else if (filter == 3) {
+      } else if (filter == 3 || filter == 4) {
         inside_roi = pixel_in_upper_rectangle(x, y, img->w, img->h);
       }
 
@@ -332,9 +364,9 @@ uint32_t find_object_centroid(struct image_t *img, int32_t* p_xc, int32_t* p_yc,
 
 void color_object_detector_periodic(void)
 {
-  static struct color_object_t local_filters[3];
+  static struct color_object_t local_filters[4];
   pthread_mutex_lock(&mutex);
-  memcpy(local_filters, global_filters, 3 * sizeof(struct color_object_t));
+  memcpy(local_filters, global_filters, 4 * sizeof(struct color_object_t));
   pthread_mutex_unlock(&mutex);
 
   if (local_filters[0].updated) {
@@ -356,5 +388,12 @@ void color_object_detector_periodic(void)
                                local_filters[2].x_c, local_filters[2].y_c,
                                0, 0, local_filters[2].color_count, 2);
     local_filters[2].updated = false;
+  }
+
+  if (local_filters[3].updated) {
+  AbiSendMsgVISUAL_DETECTION(COLOR_OBJECT_DETECTION4_ID,
+                             local_filters[3].x_c, local_filters[3].y_c,
+                             0, 0, local_filters[3].color_count, 3);
+  local_filters[3].updated = false;
   }
 }

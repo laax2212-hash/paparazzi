@@ -35,6 +35,14 @@
       <define name="COLOR_OBJECT_DETECTOR_CR_MIN3" value="0"/>
       <define name="COLOR_OBJECT_DETECTOR_CR_MAX3" value="145"/>
 
+     <!-- Detect blue -->
+      <define name="COLOR_OBJECT_DETECTOR_LUM_MIN4" value="60"/>
+      <define name="COLOR_OBJECT_DETECTOR_LUM_MAX4" value="220"/>
+      <define name="COLOR_OBJECT_DETECTOR_CB_MIN4" value="180"/>
+      <define name="COLOR_OBJECT_DETECTOR_CB_MAX4" value="255"/>
+      <define name="COLOR_OBJECT_DETECTOR_CR_MIN4" value="0"/>
+      <define name="COLOR_OBJECT_DETECTOR_CR_MAX4" value="100"/>
+
       <module name="ahrs" type="int_cmpl_quat">
         <configure name="USE_MAGNETOMETER" value="FALSE"/>
         <define name="AHRS_USE_GPS_HEADING" value="TRUE"/>
@@ -63,12 +71,20 @@
       <define name="COLOR_OBJECT_DETECTOR_CR_MAX2" value="140"/>
 
       <!-- Detect green upper -->
-      <define name="COLOR_OBJECT_DETECTOR_LUM_MIN3" value="60"/>
-      <define name="COLOR_OBJECT_DETECTOR_LUM_MAX3" value="220"/>
-      <define name="COLOR_OBJECT_DETECTOR_CB_MIN3" value="30"/>
+      <define name="COLOR_OBJECT_DETECTOR_LUM_MIN3" value="30"/>
+      <define name="COLOR_OBJECT_DETECTOR_LUM_MAX3" value="100"/>
+      <define name="COLOR_OBJECT_DETECTOR_CB_MIN3" value="100"/>
       <define name="COLOR_OBJECT_DETECTOR_CB_MAX3" value="120"/>
-      <define name="COLOR_OBJECT_DETECTOR_CR_MIN3" value="120"/>
-      <define name="COLOR_OBJECT_DETECTOR_CR_MAX3" value="140"/>
+      <define name="COLOR_OBJECT_DETECTOR_CR_MIN3" value="100"/>
+      <define name="COLOR_OBJECT_DETECTOR_CR_MAX3" value="125"/>
+      
+      <!-- Detect blue -->
+      <define name="COLOR_OBJECT_DETECTOR_LUM_MIN4" value="60"/>
+      <define name="COLOR_OBJECT_DETECTOR_LUM_MAX4" value="220"/>
+      <define name="COLOR_OBJECT_DETECTOR_CB_MIN4" value="180"/>
+      <define name="COLOR_OBJECT_DETECTOR_CB_MAX4" value="255"/>
+      <define name="COLOR_OBJECT_DETECTOR_CR_MIN4" value="0"/>
+      <define name="COLOR_OBJECT_DETECTOR_CR_MAX4" value="100"/>
 
       <module name="ahrs" type="float_mlkf"> <!-- was int_cmpl_quat  -->
         <configure name="USE_MAGNETOMETER" value="FALSE"/>
@@ -120,11 +136,16 @@
       <define name="COLOR_OBJECT_DETECTOR_CAMERA3" value="front_camera"/>
       <define name="COLOR_OBJECT_DETECTOR_FPS3" value="0"/>
       <define name="COLOR_OBJECT_DETECTOR_DRAW3" value="1"/>
+
+      <define name="COLOR_OBJECT_DETECTOR_CAMERA4" value="front_camera"/>
+      <define name="COLOR_OBJECT_DETECTOR_FPS4" value="0"/>
+      <define name="COLOR_OBJECT_DETECTOR_DRAW4" value="1"/>
     </module>
     <module name="orange_avoider">
       <define name="ORANGE_LOWER_VISUAL_DETECTION_ID" value="1"/>
       <define name="GREEN_LOWER_VISUAL_DETECTION_ID" value="2"/>
       <define name="GREEN_UPPER_VISUAL_DETECTION_ID" value="30"/>
+      <define name="BLUE_UPPER_VISUAL_DETECTION_ID" value="4"/>
     </module>
     <module name="video_rtp_stream">
       <define name="VIEWVIDEO_CAMERA" value="front_camera"/>
@@ -132,6 +153,7 @@
       <define name="VIEWVIDEO_DOWNSIZE_FACTOR" value="1"/>
       <define name="VIEWVIDEO_QUALITY_FACTOR" value="40"/>
     </module>
+
   </firmware>
 
   <commands>

@@ -20,6 +20,7 @@ so you have to define which filter to use with the ORANGE_AVOIDER_VISUAL_DETECTI
        <dl_setting var="oa_orange_obstacle_threshold" min="0" step="0.01" max="1"/>
        <dl_setting var="oa_green_floor_threshold" min="0" step="0.01" max="1"/>
        <dl_setting var="oa_green_plant_threshold" min="0" step="0.01" max="1"/>
+       <dl_setting var="oa_blue_gate_threshold" min="0" step="0.01" max="1" shortname="blue_gate_thr"/>
       </dl_settings>
     </dl_settings>
   </settings>

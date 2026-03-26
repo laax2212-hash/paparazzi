@@ -32,9 +32,10 @@ enum navigation_state_t {
   OUT_OF_BOUNDS
 };
 
-float oa_orange_obstacle_threshold = 0.35f;
-float oa_green_floor_threshold     = 0.15f;
-float oa_green_plant_threshold     = 0.02f;
+float oa_orange_obstacle_threshold = 0.30f;
+float oa_green_floor_threshold     = 0.1f;
+float oa_green_plant_threshold     = 0.15f;
+float oa_blue_gate_threshold       = 0.25f;
 
 enum navigation_state_t navigation_state = SAFE;
 float heading_increment = 5.f;
@@ -46,6 +47,7 @@ const int16_t max_trajectory_confidence = 5;
 static int32_t orange_lower_count = 0;
 static int32_t green_lower_count  = 0;
 static int32_t green_upper_count  = 0;
+static int32_t blue_upper_count = 0;
 
 #ifndef ORANGE_LOWER_VISUAL_DETECTION_ID
 #define ORANGE_LOWER_VISUAL_DETECTION_ID ABI_BROADCAST
@@ -59,9 +61,11 @@ static int32_t green_upper_count  = 0;
 #define GREEN_UPPER_VISUAL_DETECTION_ID ABI_BROADCAST
 #endif
 
+
 static abi_event orange_lower_detection_ev;
 static abi_event green_lower_detection_ev;
 static abi_event green_upper_detection_ev;
+static abi_event blue_upper_detection_ev;
 
 static void orange_lower_detection_cb(uint8_t __attribute__((unused)) sender_id,
                                       int16_t __attribute__((unused)) pixel_x,
@@ -94,6 +98,10 @@ static void green_upper_detection_cb(uint8_t __attribute__((unused)) sender_id,
                                      int16_t __attribute__((unused)) extra)
 {
   green_upper_count = quality;
+}
+
+static void blue_upper_detection_cb(uint8_t sender_id, int16_t x, int16_t y, int16_t w, int16_t h, int32_t quality, int16_t extra) {
+  blue_upper_count = quality;
 }
 
 static int32_t lower_trap_roi_pixels(int img_w, int img_h)
@@ -161,6 +169,8 @@ void orange_avoider_init(void)
   AbiBindMsgVISUAL_DETECTION(GREEN_UPPER_VISUAL_DETECTION_ID,
                              &green_upper_detection_ev,
                              green_upper_detection_cb);
+
+  AbiBindMsgVISUAL_DETECTION(BLUE_UPPER_VISUAL_DETECTION_ID, &blue_upper_detection_ev, blue_upper_detection_cb);
 }
 
 void orange_avoider_periodic(void)
@@ -178,26 +188,36 @@ void orange_avoider_periodic(void)
   float orange_ratio      = compute_ratio(orange_lower_count, lower_trap_total);
   float green_lower_ratio = compute_ratio(green_lower_count, lower_trap_total);
   float green_upper_ratio = compute_ratio(green_upper_count, upper_sq_total);
+  float blue_upper_ratio = compute_ratio(blue_upper_count, upper_sq_total);
 
   bool orange_obstacle = orange_ratio > oa_orange_obstacle_threshold;
   bool no_floor        = green_lower_ratio < oa_green_floor_threshold;
   bool plant_obstacle  = green_upper_ratio > oa_green_plant_threshold;
+  bool blue_gate_obstacle = blue_upper_ratio > oa_blue_gate_threshold;
 
-  bool obstacle_detected = orange_obstacle || no_floor || plant_obstacle;
+  if (blue_gate_obstacle) {
+    VERBOSE_PRINT("GATE DETECTED: Blue obstacle in upper ROI!\n");
+    // If you want the gate to be a "hard" stop, ensure it's included in obstacle_detected
+  }
+
+  bool obstacle_detected = orange_obstacle || no_floor || plant_obstacle || blue_gate_obstacle;
 
   VERBOSE_PRINT(
-    "orange_lower=%ld green_lower=%ld green_upper=%ld | "
-    "orange_ratio=%.4f green_lower_ratio=%.4f green_upper_ratio=%.4f | "
-    "orange_obs=%d no_floor=%d plant=%d conf=%d state=%d\n",
+    "orange_lower=%ld green_lower=%ld green_upper=%ld blue_upper=%ld | " // Added blue
+    "orange_r=%.4f green_l_r=%.4f green_u_r=%.4f blue_u_r=%.4f | "      // Added blue
+    "obs=%d floor=%d plant=%d gate=%d conf=%d state=%d\n",
     (long)orange_lower_count,
     (long)green_lower_count,
     (long)green_upper_count,
+    (long)blue_upper_count,
     orange_ratio,
     green_lower_ratio,
     green_upper_ratio,
+    blue_upper_ratio,
     orange_obstacle,
     no_floor,
     plant_obstacle,
+    blue_gate_obstacle,
     obstacle_free_confidence,
     navigation_state
   );
