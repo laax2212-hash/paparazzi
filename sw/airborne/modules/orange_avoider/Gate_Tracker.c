@@ -62,7 +62,7 @@ std::vector<fs::path> get_sorted_frame_files(const std::string& folder_path) {
 }
 
 void two_step_pnp_tracker_c(IplImage* frame, bool show_window, cv::Mat* output_frame) {
-    // 1. Downscale
+    // Downscale
     int height = frame->height;
     int width = frame->width;
     int new_width = 320;
@@ -71,7 +71,7 @@ void two_step_pnp_tracker_c(IplImage* frame, bool show_window, cv::Mat* output_f
     IplImage* small_frame = cvCreateImage(cvSize(new_width, new_height), frame->depth, frame->nChannels);
     cvResize(frame, small_frame, CV_INTER_LINEAR);
 
-    // 2. Strong Blue Masking
+    // Strong Blue Masking
     IplImage* hsv = cvCreateImage(cvGetSize(small_frame), 8, 3);
     cvCvtColor(small_frame, hsv, CV_BGR2HSV);
 
@@ -80,14 +80,13 @@ void two_step_pnp_tracker_c(IplImage* frame, bool show_window, cv::Mat* output_f
     CvScalar upper_blue = cvScalar(130, 255, 255, 0);
     cvInRangeS(hsv, lower_blue, upper_blue, mask);
 
-    // 3. Clean up the mask
+    // Clean up the mask
     IplConvKernel* kernel = cvCreateStructuringElementEx(5, 5, 2, 2, CV_SHAPE_RECT, NULL);
-    // Note: cvMorphologyEx in the C API requires a temporary image
     IplImage* temp = cvCreateImage(cvGetSize(small_frame), 8, 1);
     cvMorphologyEx(mask, mask, temp, kernel, CV_MOP_OPEN, 1);
     cvMorphologyEx(mask, mask, temp, kernel, CV_MOP_CLOSE, 1);
 
-    // 4. Find valid Blue Banners
+    //Find valid Blue Banners
     CvMemStorage* storage = cvCreateMemStorage(0);
     CvSeq* contours = 0;
     cvFindContours(mask, storage, &contours, sizeof(CvContour), CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE, cvPoint(0,0));
@@ -120,7 +119,7 @@ void two_step_pnp_tracker_c(IplImage* frame, bool show_window, cv::Mat* output_f
         }
     }
 
-    // 5. VERTICAL PAIRING LOGIC
+    //VERTICAL PAIRING LOGIC
     if (num_banners >= 2) {
         Banner* b1_best = NULL;
         Banner* b2_best = NULL;
@@ -154,7 +153,7 @@ void two_step_pnp_tracker_c(IplImage* frame, bool show_window, cv::Mat* output_f
                 bot_banner = *b1_best;
             }
 
-            // 6. EXTRACT THE 4 CORNERS FOR 3D MATH
+            // EXTRACT THE 4 CORNERS FOR 3D MATH
             float img_pts[4][2] = {
                 {(float)top_banner.x, (float)top_banner.y},
                 {(float)(top_banner.x + top_banner.w), (float)top_banner.y},
@@ -167,7 +166,7 @@ void two_step_pnp_tracker_c(IplImage* frame, bool show_window, cv::Mat* output_f
                 cvCircle(small_frame, cvPoint((int)img_pts[i][0], (int)img_pts[i][1]), 6, cvScalar(0, 0, 255, 0), -1, 8, 0);
             }
 
-            // 7. SOLVE PnP (OpenCV4-compatible API)
+            // SOLVE PnP 
             float obj_pts[4][3] = {
                 {-0.75f,  0.75f, 0.0f},
                 { 0.75f,  0.75f, 0.0f},
