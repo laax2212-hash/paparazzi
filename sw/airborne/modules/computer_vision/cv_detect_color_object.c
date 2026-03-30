@@ -1,12 +1,21 @@
-/*
- * Copyright (C) 2019 Kirk Scheper <kirkscheper@gmail.com>
+/**
+ * @file cv_detect_color_object.c
+ * @brief Color-based object detection with ROI filtering.
  *
- * Modified to support 3 ROI-aware filters:
- *   - filter 1: lower trapezoid ROI
- *   - filter 2: lower trapezoid ROI
- *   - filter 3: upper rectangle ROI
+ * This module detects colored objects using YCbCr thresholds and
+ * region-of-interest (ROI) filtering.
+ *
+ * Filters:
+ *  - Filter 1 & 2: lower trapezoid (ground-level detection)
+ *  - Filter 3 & 4: upper rectangle (forward/elevated detection)
+ *
+ * Outputs are sent via ABI messages to other modules (e.g., avoidance).
+ *
+ * Design goals:
+ *  - Real-time performance
+ *  - Reduced noise via ROI restriction
+ *  - Modular multi-filter architecture
  */
-
 #include "modules/computer_vision/cv_detect_color_object.h"
 #include "modules/computer_vision/cv.h"
 #include "modules/core/abi.h"

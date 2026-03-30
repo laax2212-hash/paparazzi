@@ -1,3 +1,27 @@
+/**
+ * @file orange_avoider.c
+ * @brief Vision-based obstacle avoidance module.
+ *
+ * This module implements a reactive obstacle avoidance strategy using
+ * color-based detections from the front camera.
+ *
+ * Inputs (via ABI messages):
+ *  - Orange (lower ROI): obstacles
+ *  - Green (lower ROI): floor detection
+ *  - Green (upper ROI): elevated obstacles (plants)
+ *  - Blue (upper ROI): gate-like structures
+ *
+ * Approach:
+ *  - Finite State Machine (FSM) for navigation
+ *  - Confidence-based filtering of detections
+ *  - Dynamic waypoint updates for smooth motion
+ *
+ * Design goals:
+ *  - Real-time performance
+ *  - Robustness to noisy detections
+ *  - Compatibility with Paparazzi UAV framework
+ */
+
 #include "modules/orange_avoider/orange_avoider.h"
 #include "firmwares/rotorcraft/navigation.h"
 #include "generated/airframe.h"
@@ -25,6 +49,23 @@ static uint8_t moveWaypoint(uint8_t waypoint, struct EnuCoor_i *new_coor);
 static uint8_t increase_nav_heading(float incrementDegrees);
 static uint8_t chooseRandomIncrementAvoidance(void);
 
+/**
+ * @brief Navigation state machine
+ *
+ * SAFE:
+ *   Drone moves forward and increases confidence if no obstacles detected.
+ *
+ * OBSTACLE_FOUND:
+ *   Triggered when confidence drops to zero.
+ *   Drone stops forward motion and prepares avoidance.
+ *
+ * SEARCH_FOR_SAFE_HEADING:
+ *   Drone rotates incrementally to find a collision-free direction.
+ *
+ * OUT_OF_BOUNDS:
+ *   Ensures the drone stays within the allowed navigation area.
+ */
+
 enum navigation_state_t {
   SAFE,
   OBSTACLE_FOUND,
@@ -36,6 +77,18 @@ float oa_orange_obstacle_threshold = 0.30f;
 float oa_green_floor_threshold     = 0.1f;
 float oa_green_plant_threshold     = 0.15f;
 float oa_blue_gate_threshold       = 0.25f;
+
+/**
+ * @brief Confidence in obstacle-free trajectory
+ *
+ * Increases when no obstacles are detected and decreases otherwise.
+ * Used to:
+ *  - Smooth noisy detections
+ *  - Avoid oscillations
+ *  - Scale forward motion distance
+ *
+ * Range: [0, max_trajectory_confidence]
+ */
 
 enum navigation_state_t navigation_state = SAFE;
 float heading_increment = 5.f;
@@ -103,6 +156,14 @@ static void green_upper_detection_cb(uint8_t __attribute__((unused)) sender_id,
 static void blue_upper_detection_cb(uint8_t sender_id, int16_t x, int16_t y, int16_t w, int16_t h, int32_t quality, int16_t extra) {
   blue_upper_count = quality;
 }
+/**
+ * ROI design:
+ * - Lower trapezoid: focuses on near-ground region in front of drone
+ * - Upper rectangle: detects obstacles at higher elevations
+ *
+ * This separation allows distinguishing between floor, obstacles,
+ * and elevated structures.
+ */
 
 static int32_t lower_trap_roi_pixels(int img_w, int img_h)
 {
@@ -230,9 +291,16 @@ void orange_avoider_periodic(void)
 
   Bound(obstacle_free_confidence, 0, max_trajectory_confidence);
 
+
+  // Forward movement distance scales with confidence:
+  // higher confidence → longer forward step → smoother navigation
+
   float moveDistance = fminf(maxDistance, 0.2f * obstacle_free_confidence);
 
+
   switch (navigation_state) {
+
+    // Move forward while updating trajectory and goal waypoints
     case SAFE:
       moveWaypointForward(WP_TRAJECTORY, 1.5f * moveDistance);
 
@@ -245,7 +313,9 @@ void orange_avoider_periodic(void)
         moveWaypointForward(WP_RETREAT, -1.0f * moveDistance);
       }
       break;
-
+      
+      // Reset waypoints to current position to stop motion
+      // and prepare for heading-based avoidance
     case OBSTACLE_FOUND:
       waypoint_move_here_2d(WP_GOAL);
       waypoint_move_here_2d(WP_RETREAT);
@@ -253,7 +323,9 @@ void orange_avoider_periodic(void)
       chooseRandomIncrementAvoidance();
       navigation_state = SEARCH_FOR_SAFE_HEADING;
       break;
-
+      
+      // Incrementally rotate until a safe direction is found
+      // Rotation direction is randomized to avoid local minima
     case SEARCH_FOR_SAFE_HEADING:
       increase_nav_heading(heading_increment);
       if (obstacle_free_confidence >= 2) {
@@ -261,6 +333,7 @@ void orange_avoider_periodic(void)
       }
       break;
 
+      // Force drone back into allowed region by adjusting heading
     case OUT_OF_BOUNDS:
       increase_nav_heading(heading_increment);
       moveWaypointForward(WP_TRAJECTORY, 1.5f);
